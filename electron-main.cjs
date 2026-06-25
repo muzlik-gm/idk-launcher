@@ -362,6 +362,7 @@ function setDiscordPresence(presence) {
 }
 
 let lastActiveUsername = 'Player';
+let elybyOAuthInProgress = false;
 
 function updateDiscordPresence(details, state, largeImageKey = 'icon', largeImageText = 'Indkingdom Launcher', showTimer = false, smallImageKey = null, smallImageText = null) {
   const cleanUser = lastActiveUsername.replace(/[^a-zA-Z0-9]/g, '') || 'player';
@@ -1405,6 +1406,11 @@ ipcMain.handle('elyby-authenticate', async (event, { username, password, clientT
 // Ely.by login — shows a credential window, authenticates via authserver.ely.by
 // Docs: https://docs.ely.by/en/minecraft-auth.html
 ipcMain.handle('elyby-oauth-login', async () => {
+  if (elybyOAuthInProgress) {
+    return { success: false, error: 'Login already in progress. Please wait for the browser window to open.' };
+  }
+  elybyOAuthInProgress = true;
+
   const CLIENT_ID = process.env.ELYBY_CLIENT_ID || 'idk-launcher';
   const CLIENT_SECRET = process.env.ELYBY_CLIENT_SECRET || '28grdBLhDN4Af1jRnkOkn9fP7tNvKftuGyb9UVzU6xwiwt1D9e1IGfJGtUUTu_ak';
   const REDIRECT_PORT = parseInt(process.env.ELYBY_REDIRECT_PORT, 10) || 29487;
@@ -1413,7 +1419,7 @@ ipcMain.handle('elyby-oauth-login', async () => {
   return new Promise((resolve) => {
     const http = require('http');
     let resolved = false;
-    const doResolve = (val) => { if (!resolved) { resolved = true; resolve(val); } };
+    const doResolve = (val) => { if (!resolved) { resolved = true; elybyOAuthInProgress = false; resolve(val); } };
 
     let server = null;
     let timeout = null;
@@ -1640,14 +1646,25 @@ ipcMain.handle('microsoft-authenticate', async (event) => {
       title: "Sign in to Minecraft",
       icon: path.join(__dirname, 'logo.png')
     });
-    
+
     const token = await xboxManager.getMinecraft();
     const mclcAuth = token.mclc();
 
     return { success: true, data: { profile: { name: mclcAuth.name }, mclcAuth } };
   } catch (e) {
     console.error("[Microsoft Auth] Error:", e);
-    return { success: false, error: e.message || "Failed to authenticate with Microsoft." };
+    const rawMsg = (e && e.message) ? e.message : String(e);
+    let friendly;
+    if (rawMsg === 'error.gui.closed' || /gui\.closed/i.test(rawMsg)) {
+      friendly = 'Login window was closed before signing in. Click Microsoft Account to try again.';
+    } else if (/network|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|fetch/i.test(rawMsg)) {
+      friendly = 'Could not reach Microsoft sign-in. Check your internet connection and try again.';
+    } else if (/cancel/i.test(rawMsg)) {
+      friendly = 'Microsoft login was cancelled.';
+    } else {
+      friendly = rawMsg || 'Failed to authenticate with Microsoft.';
+    }
+    return { success: false, error: friendly };
   }
 });
 
@@ -2122,7 +2139,20 @@ ipcMain.on('launch-modpack', async (event, args) => {
       safeSend('launch-progress', { status: 'Downloading Ely.by Injector...', percent: 50 });
       const injectorPath = await ensureAuthlibInjector(rootPath);
       if (injectorPath && fs.existsSync(injectorPath) && _isValidZip(injectorPath)) {
-        opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+        const prefetched = await prefetchAuthlibMetadata();
+        if (prefetched) {
+          opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by@${prefetched}`);
+          console.log("[Launch] Added authlib-injector with prefetched metadata.");
+        } else {
+          const reachable = await isAuthServerReachable();
+          if (reachable) {
+            opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+            console.log("[Launch] Added authlib-injector (server reachable, no prefetch).");
+          } else {
+            console.warn("[Launch] authserver.ely.by unreachable — launching WITHOUT injector to avoid crash.");
+            safeSend('launch-warning', "Ely.by auth server is unreachable. The game will launch, but Ely.by skins/auth may not work. Check your connection.");
+          }
+        }
       } else {
         console.warn("[Launch] authlib-injector.jar missing or invalid, skipping agent.");
         safeSend('launch-warning', "Ely.by skins may not work (injector unavailable).");
@@ -2617,7 +2647,20 @@ ipcMain.on('launch-minecraft', async (event, args) => {
       safeSend('launch-progress', { status: 'Downloading Ely.by Injector...', percent: 50 });
       const injectorPath = await ensureAuthlibInjector(rootPath);
       if (injectorPath && fs.existsSync(injectorPath) && _isValidZip(injectorPath)) {
-        opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+        const prefetched = await prefetchAuthlibMetadata();
+        if (prefetched) {
+          opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by@${prefetched}`);
+          console.log("[Launch] Added authlib-injector with prefetched metadata.");
+        } else {
+          const reachable = await isAuthServerReachable();
+          if (reachable) {
+            opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+            console.log("[Launch] Added authlib-injector (server reachable, no prefetch).");
+          } else {
+            console.warn("[Launch] authserver.ely.by unreachable — launching WITHOUT injector to avoid crash.");
+            safeSend('launch-warning', "Ely.by auth server is unreachable. The game will launch, but Ely.by skins/auth may not work. Check your connection.");
+          }
+        }
       } else {
         console.warn("[Launch] authlib-injector.jar missing or invalid, skipping agent.");
         safeSend('launch-warning', "Ely.by skins may not work (injector unavailable).");
@@ -3121,6 +3164,40 @@ function detectMcVersionFromMods(modsPath) {
     .map(v => [v, versionCounts[v]])
     .sort((a, b) => b[1] - a[1]);
   return sorted.length > 0 ? sorted[0][0] : null;
+}
+
+async function prefetchAuthlibMetadata() {
+  return new Promise((resolve) => {
+    const url = 'https://authserver.ely.by';
+    const req = https.get(url, { timeout: 5000 }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        if (res.statusCode === 200 && data) {
+          try {
+            const buf = Buffer.from(data, 'utf-8');
+            resolve(buf.toString('base64'));
+            return;
+          } catch (_) {}
+        }
+        resolve(null);
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+async function isAuthServerReachable() {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const req = https.get('https://authserver.ely.by', { timeout: 5000 }, (res) => {
+      res.resume();
+      resolve(res.statusCode !== undefined && res.statusCode < 500);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
 }
 
 async function ensureAuthlibInjector(rootPath) {

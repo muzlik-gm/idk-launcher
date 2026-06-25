@@ -5,6 +5,7 @@
 
 import { esc } from '../../core/safe-parse.js';
 import { state, actions } from '../../core/app-state.js';
+import { showAlertDialog } from '../../components/alert-dialog.js';
 import { checkModUpdates, getModChangelog, installModUpdate } from '../mod-updates/mod-updates-feature.js';
 import { analyzeCrash, formatAnalysis } from '../crash-analyzer/crash-analyzer-feature.js';
 import { scanMissingDependencies, resolveDependencies } from '../mod-resolver/mod-resolver-feature.js';
@@ -104,7 +105,7 @@ async function handleCheckUpdatesClick() {
       state.activeModpackId = state.modpacks[0].id;
       mp = state.modpacks[0];
     } else {
-      alert('No modpack selected. Please select a modpack first.');
+      showAlertDialog({ title: 'No Modpack Selected', message: 'Please select a modpack first.', variant: 'warning' });
       return;
     }
   }

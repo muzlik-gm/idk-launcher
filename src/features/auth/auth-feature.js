@@ -1,6 +1,7 @@
 import { state, actions } from "../../core/app-state.js";
 import { loadAvatarForUser } from "../../core/skin-texture.js";
 import { initTutorial } from "../tutorial/tutorial.js";
+import { showAlertDialog } from "../../components/alert-dialog.js";
 
 export function initAuthFeature({ switchView }) {
   // --- LOGIN LOGIC ---
@@ -30,6 +31,8 @@ export function initAuthFeature({ switchView }) {
   btnElybyLogin.addEventListener("click", async () => {
     offlineForm.classList.remove("open");
     btnElybyLogin.innerText = "Opening browser...";
+    btnElybyLogin.style.pointerEvents = "none";
+    btnElybyLogin.style.opacity = "0.6";
     try {
       if (window.electronAPI && window.electronAPI.elybyOAuthLogin) {
         const res = await window.electronAPI.elybyOAuthLogin();
@@ -57,22 +60,40 @@ export function initAuthFeature({ switchView }) {
           updateUserDisplay(state.currentUser);
           handleOnboardingFlow(switchView);
         } else {
-          alert(res?.error || "Ely.by login failed or was cancelled.");
+          await showAlertDialog({
+            title: "Ely.by Login Failed",
+            message: res?.error || "Ely.by login failed or was cancelled.",
+            confirmText: "Close",
+            variant: "error",
+          });
         }
       } else {
-        alert("Ely.by login is not available in this build.");
+        await showAlertDialog({
+          title: "Unavailable",
+          message: "Ely.by login is not available in this build.",
+          confirmText: "OK",
+          variant: "warning",
+        });
       }
     } catch (e) {
       console.error(e);
-      alert("Error during Ely.by login.");
+      await showAlertDialog({
+        title: "Ely.by Login Error",
+        message: "Something went wrong during Ely.by login. Please try again.",
+        confirmText: "Close",
+        variant: "error",
+      });
     } finally {
       btnElybyLogin.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> Ely.by Account';
+      btnElybyLogin.style.pointerEvents = "";
+      btnElybyLogin.style.opacity = "";
     }
   });
   btnMicrosoftLogin.addEventListener("click", async () => {
     offlineForm.classList.remove("open");
-
     btnMicrosoftLogin.innerText = "Logging in...";
+    btnMicrosoftLogin.style.pointerEvents = "none";
+    btnMicrosoftLogin.style.opacity = "0.6";
     try {
       if (window.electronAPI && window.electronAPI.microsoftAuthenticate) {
         const res = await window.electronAPI.microsoftAuthenticate();
@@ -91,16 +112,33 @@ export function initAuthFeature({ switchView }) {
           updateUserDisplay(state.currentUser);
           handleOnboardingFlow(switchView);
         } else {
-          alert(res?.error || "Microsoft login failed or cancelled.");
+          await showAlertDialog({
+            title: "Microsoft Login Failed",
+            message: res?.error || "Microsoft login failed or cancelled.",
+            confirmText: "Close",
+            variant: "error",
+          });
         }
       } else {
-        alert("Microsoft login is not available in this build.");
+        await showAlertDialog({
+          title: "Unavailable",
+          message: "Microsoft login is not available in this build.",
+          confirmText: "OK",
+          variant: "warning",
+        });
       }
     } catch (e) {
       console.error(e);
-      alert("Error during Microsoft login.");
+      await showAlertDialog({
+        title: "Microsoft Login Error",
+        message: "Something went wrong during Microsoft login. Please try again.",
+        confirmText: "Close",
+        variant: "error",
+      });
     } finally {
       btnMicrosoftLogin.innerHTML = '<img src="./microsoft.png" alt="Microsoft Logo" width="24" height="24" style="object-fit: contain;" /> Microsoft Account';
+      btnMicrosoftLogin.style.pointerEvents = "";
+      btnMicrosoftLogin.style.opacity = "";
     }
   });
 
@@ -187,11 +225,19 @@ Please review and accept these terms to continue.`,
     document.getElementById("display-username").innerText = name;
     const advancedHomeName = document.getElementById("advanced-home-username");
     if (advancedHomeName) advancedHomeName.innerText = name.toUpperCase();
-    const accountEl = document.querySelector(".user-details-account");
-    if (accountEl) {
-      if (state.authMode === "elyby") accountEl.innerText = "Ely.by Account";
-      else if (state.authMode === "microsoft") accountEl.innerText = "Microsoft Account";
-      else accountEl.innerText = "Offline Account";
+
+    const wrapper = document.querySelector(".user-profile-wrapper");
+    let badge = wrapper?.querySelector(".auth-badge");
+    if (!badge && wrapper) {
+      badge = document.createElement("span");
+      badge.className = "auth-badge";
+      wrapper.appendChild(badge);
+    }
+    if (badge) {
+      badge.classList.remove("auth-elyby", "auth-microsoft", "auth-offline");
+      if (state.authMode === "elyby") { badge.innerText = "ELY.BY"; badge.classList.add("auth-elyby"); }
+      else if (state.authMode === "microsoft") { badge.innerText = "MS"; badge.classList.add("auth-microsoft"); }
+      else { badge.innerText = "OFF"; badge.classList.add("auth-offline"); }
     }
 
     const skinBtn = document.getElementById("btn-dropdown-skin");

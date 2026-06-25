@@ -1,4 +1,5 @@
 ﻿import { state, actions } from "../../core/app-state.js";
+import { showAlertDialog } from "../../components/alert-dialog.js";
 
 const UI_MODE_IDS = new Set(["classic", "advanced"]);
 const PERFORMANCE_MODE_IDS = new Set(["quality", "balanced", "eco"]);
@@ -751,6 +752,16 @@ export function initSettingsFeature({ switchView }) {
       });
     }
 
+    // Force verify on launch
+    const forceUpdateToggle = document.getElementById("force-update-toggle");
+    if (forceUpdateToggle) {
+      forceUpdateToggle.checked = state.forceUpdate;
+      forceUpdateToggle.addEventListener("change", (e) => {
+        state.forceUpdate = e.target.checked;
+        localStorage.setItem("idk_force_update", String(state.forceUpdate));
+      });
+    }
+
     // Performance boost (auto-optimization)
     const autoOptToggle = document.getElementById("auto-optimization");
     if (autoOptToggle) {
@@ -1307,11 +1318,11 @@ export function initSettingsFeature({ switchView }) {
     // About tab buttons (reuse bindSharedTools but with the new adv- IDs)
     document.getElementById('adv-btn-open-folder')?.addEventListener('click', () => {
       if (window.electronAPI) window.electronAPI.openMinecraftFolder();
-      else alert('This feature is only available in the desktop app.');
+      else showAlertDialog({ title: 'Unavailable', message: 'This feature is only available in the desktop app.', variant: 'info' });
     });
     document.getElementById('adv-btn-open-folder-top')?.addEventListener('click', () => {
       if (window.electronAPI) window.electronAPI.openMinecraftFolder();
-      else alert('This feature is only available in the desktop app.');
+      else showAlertDialog({ title: 'Unavailable', message: 'This feature is only available in the desktop app.', variant: 'info' });
     });
     const advCheckUpdates = document.getElementById('adv-btn-check-launcher-updates');
     if (advCheckUpdates) advCheckUpdates.addEventListener('click', async () => {
@@ -1339,7 +1350,7 @@ export function initSettingsFeature({ switchView }) {
     });
     document.getElementById('adv-btn-toggle-devtools')?.addEventListener('click', () => {
       if (window.electronAPI) window.electronAPI.toggleDevTools();
-      else alert('Debug console is only available in the desktop app.');
+      else showAlertDialog({ title: 'Unavailable', message: 'Debug console is only available in the desktop app.', variant: 'info' });
     });
 
     // Shared tools

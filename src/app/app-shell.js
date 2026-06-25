@@ -68,7 +68,6 @@
           <div class="user-details">
             <span class="user-details-label">Playing as</span>
             <h4 id="display-username">PlayerOne</h4>
-            <span class="user-details-account" style="display: none;">Offline Account</span>
           </div>
         </div>
 
@@ -585,6 +584,16 @@
               <button class="glass-btn" id="btn-browse-minecraft-path">Browse</button>
               <button class="glass-btn danger" id="btn-clear-minecraft-path" title="Reset">&times;</button>
             </div>
+          </div>
+          <div class="settings-row force-verify-row">
+            <div class="settings-row-label">
+              <span>Force Verify on Launch</span>
+              <small>Re-verify and re-download game files before every launch</small>
+            </div>
+            <label class="tg-switch">
+              <input type="checkbox" id="force-update-toggle" />
+              <span class="tg-slider"></span>
+            </label>
           </div>
 
         </div>

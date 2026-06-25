@@ -337,6 +337,16 @@ if (playDropdownTrigger && playDropdown) {
     });
   });
 
+  // Force update checkbox (in Settings > Launch tab)
+  const forceUpdateCb = document.getElementById('force-update-toggle');
+  if (forceUpdateCb) {
+    forceUpdateCb.checked = state.forceUpdate;
+    forceUpdateCb.addEventListener('change', () => {
+      state.forceUpdate = forceUpdateCb.checked;
+      localStorage.setItem('idk_force_update', state.forceUpdate);
+    });
+  }
+
   document.addEventListener('click', (e) => {
     const wrapper = document.getElementById('play-btn-wrapper');
     if (wrapper && !wrapper.contains(e.target)) {
@@ -718,6 +728,7 @@ playBtn.addEventListener('click', async (e) => {
           windowSize,
           globalJavaArgs: state.globalJavaArgs,
           quickConnect: state.quickConnectTarget,
+          forceUpdate: state.forceUpdate,
         });
         state.quickConnectTarget = null;
         return;
@@ -734,7 +745,8 @@ playBtn.addEventListener('click', async (e) => {
       authData,
       state.quickConnectTarget,
       windowSize,
-      state.globalJavaArgs
+      state.globalJavaArgs,
+      state.forceUpdate
     );
     state.quickConnectTarget = null; // Reset after launch
   } else {

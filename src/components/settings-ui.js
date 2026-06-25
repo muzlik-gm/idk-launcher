@@ -1,9 +1,9 @@
 /**
  * Settings UI Component
- * 
+ *
  * Provides a settings panel with categories, search, form inputs,
  * tooltips, and action buttons for managing download and integrity settings.
- * 
+ *
  * Responsibilities:
  * - Display settings organized by category
  * - Provide search/filter functionality
@@ -12,6 +12,8 @@
  * - Handle save, reset, export, import actions
  * - Validate inputs before saving
  */
+
+import { showAlertDialog } from './alert-dialog.js';
 
 class SettingsUI {
   constructor() {
@@ -372,18 +374,18 @@ class SettingsUI {
           (expectedType === actualType);
 
         if (!typeOk) {
-          alert(`Invalid value for ${setting.label}: expected ${expectedType}, got ${actualType}`);
+          await showAlertDialog({ title: 'Invalid Setting', message: `Invalid value for ${setting.label}: expected ${expectedType}, got ${actualType}`, variant: 'error' });
           return;
         }
 
         // Range validation
         if (expectedType === 'number') {
           if (setting.min !== undefined && value < setting.min) {
-            alert(`${setting.label} must be at least ${setting.min}`);
+            await showAlertDialog({ title: 'Invalid Setting', message: `${setting.label} must be at least ${setting.min}`, variant: 'error' });
             return;
           }
           if (setting.max !== undefined && value > setting.max) {
-            alert(`${setting.label} must be at most ${setting.max}`);
+            await showAlertDialog({ title: 'Invalid Setting', message: `${setting.label} must be at most ${setting.max}`, variant: 'error' });
             return;
           }
         }
@@ -398,11 +400,11 @@ class SettingsUI {
       this.isDirty = false;
       this._updateSaveButton();
 
-      alert('Settings saved successfully');
+      await showAlertDialog({ title: 'Settings Saved', message: 'Settings saved successfully', variant: 'success' });
       this.close();
     } catch (error) {
       console.error('[SettingsUI] Error saving settings:', error);
-      alert(`Error saving settings: ${error.message}`);
+      await showAlertDialog({ title: 'Save Error', message: `Error saving settings: ${error.message}`, variant: 'error' });
     }
   }
 
@@ -428,10 +430,10 @@ class SettingsUI {
       this._updateSaveButton();
       this._renderSettings();
 
-      alert('Settings reset to defaults');
+      await showAlertDialog({ title: 'Settings Reset', message: 'Settings reset to defaults', variant: 'success' });
     } catch (error) {
       console.error('[SettingsUI] Error resetting settings:', error);
-      alert(`Error resetting settings: ${error.message}`);
+      await showAlertDialog({ title: 'Reset Error', message: `Error resetting settings: ${error.message}`, variant: 'error' });
     }
   }
 
@@ -443,10 +445,10 @@ class SettingsUI {
   async _handleExport() {
     try {
       await window.electronAPI.exportSettings();
-      alert('Settings exported successfully');
+      await showAlertDialog({ title: 'Exported', message: 'Settings exported successfully', variant: 'success' });
     } catch (error) {
       console.error('[SettingsUI] Error exporting settings:', error);
-      alert(`Error exporting settings: ${error.message}`);
+      await showAlertDialog({ title: 'Export Error', message: `Error exporting settings: ${error.message}`, variant: 'error' });
     }
   }
 
@@ -466,10 +468,10 @@ class SettingsUI {
       this._updateSaveButton();
       this._renderSettings();
 
-      alert('Settings imported successfully');
+      await showAlertDialog({ title: 'Imported', message: 'Settings imported successfully', variant: 'success' });
     } catch (error) {
       console.error('[SettingsUI] Error importing settings:', error);
-      alert(`Error importing settings: ${error.message}`);
+      await showAlertDialog({ title: 'Import Error', message: `Error importing settings: ${error.message}`, variant: 'error' });
     }
   }
 

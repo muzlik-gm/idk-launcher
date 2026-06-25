@@ -8,6 +8,55 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+      html, body { margin: 0; padding: 0; background: #0a0a0c; }
+      #app:empty::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 50% 45%, rgba(76, 184, 55, 0.10), transparent 55%),
+          #0a0a0c;
+      }
+      [data-modal],
+      .confirm-modal,
+      .delete-modal,
+      .custom-modal,
+      #update-modal,
+      .mp-create-modal,
+      .mp-settings-modal,
+      .mp-all-versions-modal,
+      .dl-confirm-modal,
+      .mod-updates-modal,
+      .changelog-modal,
+      .crash-analyzer-modal,
+      .dependencies-modal,
+      .alert-dialog {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        display: none !important;
+      }
+      [data-modal].active,
+      .confirm-modal.active,
+      .delete-modal.active,
+      .custom-modal.active,
+      #update-modal.active,
+      .mp-create-modal.active,
+      .mp-settings-modal.active,
+      .mp-all-versions-modal.active,
+      .dl-confirm-modal.active,
+      .mod-updates-modal.active,
+      .changelog-modal.active,
+      .crash-analyzer-modal.active,
+      .dependencies-modal.active,
+      .alert-dialog.active {
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        display: flex !important;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

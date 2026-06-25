@@ -45,6 +45,7 @@ export const state = {
   analyticsEnabled: localStorage.getItem("idk_analytics") === "true",
   javaPath: localStorage.getItem("craftlaunch_javaPath") || "",
   globalJavaArgs: localStorage.getItem("idk_global_java_args") || "",
+  forceUpdate: localStorage.getItem("idk_force_update") === "true",
   customMinecraftPath: localStorage.getItem("idk_custom_minecraft_path") || "",
   defaultWindowWidth: parseInt(
     localStorage.getItem("idk_default_window_width") || "1024",
