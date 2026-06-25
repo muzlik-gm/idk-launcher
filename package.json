@@ -27,7 +27,8 @@
     },
     "win": {
       "icon": "logo.png",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
+      "artifactName": "IDK-Launcher-v${version}-Windows-${arch}.${ext}",
       "target": [
         "nsis"
       ]
@@ -41,6 +42,7 @@
     },
     "mac": {
       "icon": "logo.png",
+      "artifactName": "IDK-Launcher-v${version}-macOS.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -48,6 +50,7 @@
     },
     "linux": {
       "icon": "logo.png",
+      "artifactName": "IDK-Launcher-v${version}-Linux-${arch}.${ext}",
       "maintainer": "Jeflacc <109415855+Jeflacc@users.noreply.github.com>",
       "target": [
         "AppImage",

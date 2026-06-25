@@ -54,6 +54,10 @@ const { scanProfileAchievements, scanAllAchievements, resolveProfilePath } = req
 const msmc = require('msmc');
 
 app.commandLine.appendSwitch('js-flags', '--expose_gc');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization');
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 protocol.registerSchemesAsPrivileged([
@@ -469,6 +473,14 @@ function createWindow() {
   mainWindow.on('unmaximize', syncWindowState);
   mainWindow.on('resize', syncWindowState);
 }
+
+app.on('web-contents-created', (event, contents) => {
+  contents.on('before-input-event', (event, input) => {
+    if ((input.control && input.shift && input.key.toLowerCase() === 'i') || input.key === 'F12') {
+      event.preventDefault();
+    }
+  });
+});
 
 app.whenReady().then(() => {
   autoCleanJunkFiles();
@@ -2441,7 +2453,16 @@ ipcMain.on('launch-modpack', async (event, args) => {
     await cleanEmptyFiles(path.join(rootPath, 'libraries'));
     await cleanEmptyFiles(path.join(rootPath, 'versions'));
 
-    const mcProcess = await launchClient.launch(opts);
+    let mcProcess;
+    try {
+      mcProcess = await launchClient.launch(opts);
+    } catch (err) {
+      console.error(`[Launch] MCLC launch failed:`, err);
+      safeSend('launch-error', { message: `Launch failed: ${err.message}`, version: mcVersion, loader: loaderName });
+      __heartbeatActive = false;
+      global.isLaunchDownloading = false;
+      return;
+    }
     global.isLaunchDownloading = false;
     __heartbeatActive = false;
     activeLaunchProcess = mcProcess;
@@ -3030,7 +3051,16 @@ ipcMain.on('launch-minecraft', async (event, args) => {
       console.warn(`[Launch] Launch was cancelled before MCLC started.`);
       return;
     }
-    const mcProcess = await launchClient.launch(opts);
+    let mcProcess;
+    try {
+      mcProcess = await launchClient.launch(opts);
+    } catch (err) {
+      console.error(`[Launch] MCLC launch failed:`, err);
+      safeSend('launch-error', { message: `Launch failed: ${err.message}`, version: launchVersion, loader: loaderName });
+      __heartbeatActive = false;
+      global.isLaunchDownloading = false;
+      return;
+    }
     if (!global.isLaunchDownloading) {
       console.warn(`[Launch] Launch was cancelled during MCLC download.`);
       if (mcProcess && typeof mcProcess.kill === 'function') mcProcess.kill();
@@ -4225,7 +4255,11 @@ function installSodium(version, profilePath) {
             return resolve(false); // Signal: not supported
           }
 
-          const fileObj = json[0].files.find(f => f.primary) || json[0].files[0];
+          let targetVersion = json.find(v => v.version_type === 'release');
+          if (!targetVersion) targetVersion = json.find(v => v.version_type === 'beta');
+          if (!targetVersion) targetVersion = json[0];
+
+          const fileObj = targetVersion.files.find(f => f.primary) || targetVersion.files[0];
           const downloadUrl = fileObj.url;
           const fileName = fileObj.filename;
 
@@ -4278,7 +4312,11 @@ function installModrinthProject(projectSlug, version, profilePath, removeKeyword
             return resolve(false);
           }
 
-          const fileObj = json[0].files.find(f => f.primary) || json[0].files[0];
+          let targetVersion = json.find(v => v.version_type === 'release');
+          if (!targetVersion) targetVersion = json.find(v => v.version_type === 'beta');
+          if (!targetVersion) targetVersion = json[0];
+
+          const fileObj = targetVersion.files.find(f => f.primary) || targetVersion.files[0];
           const downloadUrl = fileObj.url;
           const fileName = fileObj.filename;
 
@@ -5740,3 +5778,8 @@ ipcMain.handle('select-image', async (event) => {
 // ============================================================
 // === END OF FILE =============================================
 // ============================================================
+
+setInterval(() => {
+  const mem = process.memoryUsage();
+  console.log(`[Performance] Main Process RSS: ${Math.round(mem.rss / 1024 / 1024)}MB | Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB`);
+}, 10000);
