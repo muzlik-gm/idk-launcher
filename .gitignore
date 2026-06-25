@@ -50,3 +50,6 @@ tests/
 .env.local
 .env.*.local
 opencode.json
+.github/skills
+NUL
+.vite
