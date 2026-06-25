@@ -1185,6 +1185,7 @@ export function initModpacksFeature({ switchView }) {
   const setupIconPicker = (pickerId, inputId) => {
     const picker = document.getElementById(pickerId);
     if (!picker) return;
+    const fileInput = picker.querySelector('.icon-picker-input');
     picker.addEventListener("click", async () => {
       if (window.electronAPI?.selectImage) {
         const result = await window.electronAPI.selectImage();
@@ -1192,8 +1193,23 @@ export function initModpacksFeature({ switchView }) {
           document.getElementById(inputId).value = result.url;
           picker.innerHTML = `<img src="${result.url}" />`;
         }
+      } else if (fileInput) {
+        fileInput.click();
       }
     });
+    if (fileInput) {
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const url = e.target.result;
+          document.getElementById(inputId).value = url;
+          picker.innerHTML = `<img src="${url}" />`;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   setupIconPicker("new-mp-icon-picker", "new-mp-icon");

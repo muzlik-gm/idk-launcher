@@ -43,6 +43,7 @@ tests/
 .claude
 .agents
 .github/prompts
+.github/skills
 .agent
 
 # Environment secrets

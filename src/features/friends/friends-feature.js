@@ -83,7 +83,6 @@ function renderFriendsSidebar() {
               '</div>' +
               '<button id="btn-settings-save-security" class="friends-btn small">Save</button>' +
             '</div>' +
-            '<div class="settings-divider"></div>' +
             '<div class="settings-section">' +
               '<div class="settings-section-title">Linked Minecraft</div>' +
               '<div class="settings-section-desc">Link your launcher Minecraft account to your IDK profile</div>' +
@@ -298,8 +297,11 @@ export function initFriendsFeature() {
       if (!sidebar) return;
       sidebar.classList.remove("active");
       if (sidebarBackdrop) sidebarBackdrop.classList.remove("active");
-      // Also close any open sub-panel so the sidebar re-opens in the main view next time
       document.querySelectorAll(".friends-sub-panel.active").forEach(p => p.classList.remove("active"));
+      if (chatPanel) chatPanel.style.display = "none";
+      if (idkToken && idkUser && mainPanel) {
+        mainPanel.style.display = "flex";
+      }
     };
 
     if (btnToggleSidebar) {
@@ -322,6 +324,10 @@ export function initFriendsFeature() {
       const activeSub = document.querySelector(".friends-sub-panel.active");
       if (activeSub) {
         activeSub.classList.remove("active");
+        if (chatPanel) chatPanel.style.display = "none";
+        if (idkToken && idkUser && mainPanel) {
+          mainPanel.style.display = "flex";
+        }
         return;
       }
       closeSidebar();
@@ -915,15 +921,13 @@ export function initFriendsFeature() {
     // Uses classList (not inline display) so CSS in friends.css controls
     // visibility via the .active class — keeps concerns separated.
     function showPanel(panelName) {
-      [mainPanel, searchPanel, profilePanel, settingsPanel, chatPanel].forEach(p => {
+      [mainPanel, chatPanel].forEach(p => {
         if (!p) return;
-        if (p === mainPanel) {
-          // mainPanel toggles via inline display because it's a sibling of
-          // authPanel (both inside friends-sidebar-content), not a sub-panel.
-          p.style.display = "none";
-        } else {
-          p.classList.remove("active");
-        }
+        p.style.display = "none";
+      });
+      [searchPanel, profilePanel, settingsPanel].forEach(p => {
+        if (!p) return;
+        p.classList.remove("active");
       });
 
       if (panelName === "main" && mainPanel) mainPanel.style.display = "flex";
@@ -1649,9 +1653,9 @@ export function initFriendsFeature() {
       activeChatFriendUsername = null;
 
       chatPanel.style.display = "none";
-      mainPanel.style.display = "flex";
-      if (idkToken && idkUser) {
-        refreshFriendsData(); // Refresh friends list to clear unread counts instantly
+      if (idkToken && idkUser && mainPanel) {
+        mainPanel.style.display = "flex";
+        refreshFriendsData();
       }
     }
 
@@ -1803,7 +1807,7 @@ export function initFriendsFeature() {
 
     // Attempt auto-login when returning to main view (e.g. after Minecraft login)
     document.addEventListener("idk:view-changed", (e) => {
-      if (e.detail && e.detail.view === "main") {
+      if (e.detail && e.detail.viewName === "main") {
         attemptAutoLogin();
       }
     });

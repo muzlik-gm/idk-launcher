@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, screen, protocol, net, nativeImage } = require('electron');
 require('dotenv').config();
 
+const isDev = !app.isPackaged;
+const log = isDev ? console.log : () => {};
+const logWarn = isDev ? console.warn : () => {};
+
 // --- Main-process heartbeat watchdog ---
 // Windows marks a window as "Not Responding" if the owning process
 // doesn't pump its message loop for ~5 seconds. During a heavy
@@ -553,7 +557,7 @@ ipcMain.on('open-external', (event, url) => {
 });
 
 // Forward renderer console.log to terminal
-ipcMain.on('renderer-log', (_e, msg) => console.log('[Renderer]', msg));
+ipcMain.on('renderer-log', (_e, msg) => { if (isDev) console.log('[Renderer]', msg); });
 
 ipcMain.on('toggle-devtools', () => {
   if (mainWindow) {
@@ -1476,20 +1480,105 @@ ipcMain.handle('elyby-oauth-login', async () => {
                   userRes.on('end', () => {
                     try {
                       const userInfo = JSON.parse(userData);
-                      const result = {
-                        success: true,
-                        data: {
-                          accessToken: tokenData.access_token,
-                          tokenType: tokenData.token_type || 'Bearer',
-                          expiresIn: tokenData.expires_in || 86400,
-                          user: {
-                            username: userInfo.username || userInfo.login || 'Unknown',
-                            uuid: userInfo.uuid || userInfo.id || ''
-                          }
+                      const elybyUsername = userInfo.username || userInfo.login || 'Unknown';
+                      const elybyUuid = userInfo.uuid || userInfo.id || '';
+                      const clientToken = crypto.randomUUID();
+
+                      const yggBody = JSON.stringify({
+                        agent: { name: 'Minecraft', version: 1 },
+                        username: elybyUsername,
+                        password: tokenData.access_token,
+                        clientToken: clientToken,
+                        requestUser: true
+                      });
+
+                      const yggReq = https.request({
+                        hostname: 'authserver.ely.by',
+                        port: 443,
+                        path: '/auth/authenticate',
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Content-Length': Buffer.byteLength(yggBody)
                         }
-                      };
-                      cleanup();
-                      doResolve(result);
+                      }, (yggRes) => {
+                        let yggData = '';
+                        yggRes.on('data', chunk => yggData += chunk);
+                        yggRes.on('end', () => {
+                          try {
+                            const yggResult = JSON.parse(yggData);
+                            const yggProfile = yggResult.selectedProfile;
+                            const result = {
+                              success: true,
+                              data: {
+                                accessToken: yggResult.accessToken || tokenData.access_token,
+                                clientToken: yggResult.clientToken || clientToken,
+                                tokenType: 'Bearer',
+                                expiresIn: tokenData.expires_in || 86400,
+                                refreshToken: tokenData.refresh_token || null,
+                                tokenCreatedAt: Date.now(),
+                                user: {
+                                  username: elybyUsername,
+                                  uuid: elybyUuid
+                                },
+                                selectedProfile: yggProfile || {
+                                  name: elybyUsername,
+                                  id: elybyUuid
+                                }
+                              }
+                            };
+                            cleanup();
+                            doResolve(result);
+                          } catch (e) {
+                            const result = {
+                              success: true,
+                              data: {
+                                accessToken: tokenData.access_token,
+                                clientToken: clientToken,
+                                tokenType: 'Bearer',
+                                expiresIn: tokenData.expires_in || 86400,
+                                refreshToken: tokenData.refresh_token || null,
+                                tokenCreatedAt: Date.now(),
+                                user: {
+                                  username: elybyUsername,
+                                  uuid: elybyUuid
+                                },
+                                selectedProfile: {
+                                  name: elybyUsername,
+                                  id: elybyUuid
+                                }
+                              }
+                            };
+                            cleanup();
+                            doResolve(result);
+                          }
+                        });
+                      });
+                      yggReq.on('error', () => {
+                        const result = {
+                          success: true,
+                          data: {
+                            accessToken: tokenData.access_token,
+                            clientToken: clientToken,
+                            tokenType: 'Bearer',
+                            expiresIn: tokenData.expires_in || 86400,
+                            refreshToken: tokenData.refresh_token || null,
+                            tokenCreatedAt: Date.now(),
+                            user: {
+                              username: elybyUsername,
+                              uuid: elybyUuid
+                            },
+                            selectedProfile: {
+                              name: elybyUsername,
+                              id: elybyUuid
+                            }
+                          }
+                        };
+                        cleanup();
+                        doResolve(result);
+                      });
+                      yggReq.write(yggBody);
+                      yggReq.end();
                     } catch (e) {
                       cleanup();
                       doResolve({ success: false, error: 'Failed to parse user info' });
@@ -2032,7 +2121,12 @@ ipcMain.on('launch-modpack', async (event, args) => {
     try {
       safeSend('launch-progress', { status: 'Downloading Ely.by Injector...', percent: 50 });
       const injectorPath = await ensureAuthlibInjector(rootPath);
-      opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+      if (injectorPath && fs.existsSync(injectorPath) && _isValidZip(injectorPath)) {
+        opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+      } else {
+        console.warn("[Launch] authlib-injector.jar missing or invalid, skipping agent.");
+        safeSend('launch-warning', "Ely.by skins may not work (injector unavailable).");
+      }
     } catch (e) {
       console.warn("[Launch] Ely.by injector failed:", e.message);
       safeSend('launch-warning', "Ely.by skins may not work (injector failed).");
@@ -2178,11 +2272,11 @@ ipcMain.on('launch-modpack', async (event, args) => {
 
   let outputBuffer = '';
   const launchClient = new Client();
-  launchClient.on('debug', (e) => console.log(`[MCLC] debug:`, e));
+  launchClient.on('debug', (e) => { if (isDev) console.log(`[MCLC] debug:`, e); });
   launchClient.on('progress', (e) => {
     let percent = e.task !== undefined && e.total > 0 ? Math.round((e.task / e.total) * 100) : undefined;
     const status = `Verifying ${e.type || 'files'} (${e.task}/${e.total})...`;
-    console.log(`[MCLC] progress: ${status} ${percent !== undefined ? percent + '%' : ''}`);
+    if (isDev) console.log(`[MCLC] progress: ${status} ${percent !== undefined ? percent + '%' : ''}`);
     safeSend('launch-progress', { status, percent });
   });
   let dlSpeedTime1 = Date.now();
@@ -2219,7 +2313,7 @@ ipcMain.on('launch-modpack', async (event, args) => {
   });
   launchClient.on('data', (e) => {
     const str = e.toString();
-    console.log(`[Minecraft stdout] ${str.trim()}`);
+    if (isDev) console.log(`[Minecraft stdout] ${str.trim()}`);
     outputBuffer += str;
     if (outputBuffer.length > 5000) outputBuffer = outputBuffer.slice(-5000);
     const match = outputBuffer.match(/error reading (.*?\.jar)/i);
@@ -2522,7 +2616,12 @@ ipcMain.on('launch-minecraft', async (event, args) => {
     try {
       safeSend('launch-progress', { status: 'Downloading Ely.by Injector...', percent: 50 });
       const injectorPath = await ensureAuthlibInjector(rootPath);
-      opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+      if (injectorPath && fs.existsSync(injectorPath) && _isValidZip(injectorPath)) {
+        opts.customArgs.push(`-javaagent:${injectorPath}=https://authserver.ely.by`);
+      } else {
+        console.warn("[Launch] authlib-injector.jar missing or invalid, skipping agent.");
+        safeSend('launch-warning', "Ely.by skins may not work (injector unavailable).");
+      }
     } catch (e) {
       console.warn("[Launch] Ely.by injector failed:", e.message);
       safeSend('launch-warning', "Ely.by skins may not work (injector failed).");
@@ -2741,7 +2840,7 @@ ipcMain.on('launch-minecraft', async (event, args) => {
   // --- Version-launch auto-healing + close handler ---
   let outputBuffer = '';
   const launchClient = new Client();
-  launchClient.on('debug', (e) => console.log(`[MCLC] debug:`, e));
+  launchClient.on('debug', (e) => { if (isDev) console.log(`[MCLC] debug:`, e); });
   launchClient.on('progress', (e) => {
     let statusText = `Verifying ${e.type || 'files'}...`;
     let percent;
@@ -2786,7 +2885,7 @@ ipcMain.on('launch-minecraft', async (event, args) => {
   });
   launchClient.on('data', (e) => {
     const str = e.toString();
-    console.log(`[Minecraft stdout] ${str.trim()}`);
+    if (isDev) console.log(`[Minecraft stdout] ${str.trim()}`);
     outputBuffer += str;
     if (outputBuffer.length > 5000) outputBuffer = outputBuffer.slice(-5000);
     const match = outputBuffer.match(/error reading (.*?\.jar)/i);
@@ -3026,13 +3125,16 @@ function detectMcVersionFromMods(modsPath) {
 
 async function ensureAuthlibInjector(rootPath) {
   const libPath = path.join(rootPath, 'authlib-injector.jar');
-  if (fs.existsSync(libPath)) return libPath;
+  if (fs.existsSync(libPath) && _isValidZip(libPath) && fs.statSync(libPath).size >= 50000) {
+    return libPath;
+  }
+
+  if (fs.existsSync(libPath)) try { fs.unlinkSync(libPath); } catch {}
 
   if (!fs.existsSync(rootPath)) {
     fs.mkdirSync(rootPath, { recursive: true });
   }
 
-  // Try direct download URLs first to bypass GitHub API rate-limiting completely!
   const directUrls = [
     'https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.7/authlib-injector-1.2.7.jar',
     'https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.5/authlib-injector-1.2.5.jar'
@@ -3043,13 +3145,17 @@ async function ensureAuthlibInjector(rootPath) {
       await new Promise((resolve, reject) => {
         downloadFile(url, libPath, resolve, reject);
       });
-      return libPath;
+      if (_isValidZip(libPath) && fs.statSync(libPath).size >= 50000) {
+        console.log(`[Injector] Successfully downloaded from ${url}`);
+        return libPath;
+      }
+      console.warn(`[Injector] Downloaded JAR failed validation from ${url}`);
+      try { fs.unlinkSync(libPath); } catch {}
     } catch (err) {
       console.warn(`[Injector] Direct download failed for ${url}:`, err.message);
     }
   }
 
-  // Fallback to GitHub API if direct links fail
   return new Promise((resolve, reject) => {
     https.get('https://api.github.com/repos/yushijinhun/authlib-injector/releases/latest', { headers: { 'User-Agent': 'IDKLauncher/1.0' } }, (res) => {
       let data = '';
@@ -3059,7 +3165,16 @@ async function ensureAuthlibInjector(rootPath) {
           const json = JSON.parse(data);
           const asset = json.assets.find(a => a.name.endsWith('.jar'));
           if (!asset) return reject(new Error('No authlib-injector jar found'));
-          downloadFile(asset.browser_download_url, libPath, () => resolve(libPath), reject);
+          if (fs.existsSync(libPath)) try { fs.unlinkSync(libPath); } catch {}
+          downloadFile(asset.browser_download_url, libPath, () => {
+            if (_isValidZip(libPath) && fs.statSync(libPath).size >= 50000) {
+              console.log(`[Injector] Successfully downloaded from GitHub API`);
+              resolve(libPath);
+            } else {
+              try { fs.unlinkSync(libPath); } catch {}
+              reject(new Error('Downloaded authlib-injector.jar failed integrity check'));
+            }
+          }, reject);
         } catch (e) { reject(e); }
       });
     }).on('error', reject);
@@ -3235,6 +3350,27 @@ function _isValidZip(filePath) {
     try { fs.readSync(fd, header, 0, 4, 0); } finally { fs.closeSync(fd); }
     return header[0] === 0x50 && header[1] === 0x4b;
   } catch { return false; }
+}
+
+function _isValidJar(filePath) {
+  try {
+    if (!_isValidZip(filePath)) return false;
+    const stat = fs.statSync(filePath);
+    if (stat.size < 50000) return false;
+    const fd = fs.openSync(filePath, 'r');
+    const checkLen = Math.min(stat.size, 1024);
+    const head = Buffer.alloc(checkLen);
+    try { fs.readSync(fd, head, 0, checkLen, 0); } finally { fs.closeSync(fd); }
+    const headStr = head.toString('utf8', 0, Math.min(checkLen, 200));
+    if (headStr.includes('<!DOCTYPE') || headStr.includes('<html')) {
+      console.warn(`[Injector] ${filePath} is an HTML page, not a JAR`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn(`[Injector] Validation error for ${filePath}:`, e.message);
+    return false;
+  }
 }
 
 async function _isValidZipAsync(filePath) {

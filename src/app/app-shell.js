@@ -265,10 +265,16 @@
 
               <div class="play-dropdown-divider"></div>
 
-              <button class="play-dropdown-item" id="play-dd-modpacks">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                Modpacks
-              </button>
+              <div class="play-dd-footer" id="play-dd-footer">
+                <button id="play-dd-modpacks">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                  Modpacks
+                </button>
+                <button id="play-dd-all-versions">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  All versions
+                </button>
+              </div>
             </div>
           </div>
           <button class="manage-mods-button" id="manage-mods-btn" style="display: none;">MANAGE MODS</button>
@@ -1596,22 +1602,23 @@
       <div class="mp-create-modal" id="mp-create-modal" data-modal>
         <div class="mp-create-box">
           <h3>New Modpack</h3>
-          <div style="display:flex;gap:12px;align-items:center;">
+          <div class="mp-create-body">
             <div class="icon-picker" id="new-mp-icon-picker" title="Select custom icon">
               <div class="icon-picker-placeholder"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+              <input type="file" accept="image/*" class="icon-picker-input" id="new-mp-icon-input" />
             </div>
             <input type="hidden" id="new-mp-icon" value="" />
-            <div style="flex:1;display:flex;flex-direction:column;gap:12px;">
-              <input class="clean-input" id="new-mp-name" placeholder="Modpack name..." style="text-align:left;" />
-              <div style="display:flex;gap:12px;">
+            <div class="mp-create-fields">
+              <input class="clean-input" id="new-mp-name" placeholder="Modpack name..." />
+              <div class="mp-create-selects">
                 <select class="clean-select" id="new-mp-version"></select>
                 <select class="clean-select" id="new-mp-loader"><option value="Fabric">Fabric</option><option value="Forge">Forge</option><option value="NeoForge">NeoForge</option><option value="Quilt">Quilt</option><option value="Vanilla">Vanilla</option></select>
               </div>
             </div>
           </div>
-          <div style="display:flex;gap:10px;">
-            <button class="submit-btn" id="btn-confirm-create-mp" style="flex:1;">Create</button>
-            <button class="modal-btn" id="btn-cancel-create-mp" style="flex:1;">Cancel</button>
+          <div class="mp-create-actions">
+            <button class="submit-btn" id="btn-confirm-create-mp">Create</button>
+            <button class="modal-btn cancel" id="btn-cancel-create-mp">Cancel</button>
           </div>
         </div>
       </div>
@@ -1631,6 +1638,7 @@
             <div style="display:flex;gap:16px;align-items:center;">
               <div class="icon-picker" id="mp-settings-icon-picker" title="Select custom icon">
                 <div class="icon-picker-placeholder"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                <input type="file" accept="image/*" class="icon-picker-input" id="mp-settings-icon-input" />
               </div>
               <input type="hidden" id="mp-settings-icon" value="" />
               <div class="mp-settings-section" style="flex:1;">

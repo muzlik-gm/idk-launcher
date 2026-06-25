@@ -44,9 +44,12 @@ export function initAuthFeature({ switchView }) {
             authMode: state.authMode,
             elybyData: {
               accessToken: res.data.accessToken,
+              clientToken: res.data.clientToken,
               tokenType: res.data.tokenType,
               expiresIn: res.data.expiresIn,
-              selectedProfile: { name: res.data.user.username, id: res.data.user.uuid },
+              refreshToken: res.data.refreshToken || null,
+              tokenCreatedAt: res.data.tokenCreatedAt || Date.now(),
+              selectedProfile: res.data.selectedProfile || { name: res.data.user.username, id: res.data.user.uuid },
               user: res.data.user,
             }
           }).catch(console.error);

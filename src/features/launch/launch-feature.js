@@ -146,28 +146,6 @@ function populateVersionList() {
     });
     list.appendChild(wrapper);
   });
-  // "More" button that opens the full version dropdown
-  const moreBtn = document.createElement('button');
-  moreBtn.className = 'play-dd-version-btn play-dd-version-more';
-  moreBtn.textContent = 'All versions…';
-  moreBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const pd = document.getElementById('play-dropdown');
-    const pdt = document.getElementById('play-dropdown-trigger');
-    if (pd) pd.classList.remove('active');
-    if (pdt) pdt.classList.remove('active');
-    if (window.showLaunchVersionPicker) {
-      window.showLaunchVersionPicker();
-    } else {
-      // Fallback: try to open the old version-dropdown
-      const versionDropdown = document.getElementById('version-dropdown');
-      if (versionDropdown) {
-        versionDropdown.classList.add('open');
-        document.getElementById('selected-version-text')?.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  });
-  list.appendChild(moreBtn);
 }
 
 // Own renderer for play-dropdown "All versions" modal — selects version for launch
@@ -319,6 +297,21 @@ if (playDropdownTrigger && playDropdown) {
     playDropdown.classList.remove('active');
     playDropdownTrigger.classList.remove('active');
     actions.switchView('mods');
+  });
+
+  document.getElementById('play-dd-all-versions').addEventListener('click', (e) => {
+    e.stopPropagation();
+    playDropdown.classList.remove('active');
+    playDropdownTrigger.classList.remove('active');
+    if (window.showLaunchVersionPicker) {
+      window.showLaunchVersionPicker();
+    } else {
+      const versionDropdown = document.getElementById('version-dropdown');
+      if (versionDropdown) {
+        versionDropdown.classList.add('open');
+        document.getElementById('selected-version-text')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   });
 
   // Loader buttons
